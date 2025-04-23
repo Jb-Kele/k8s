@@ -1,0 +1,75 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: my-web-deployment-multi-pod
+  labels:
+    app  : my-k8s-deployment
+    env  : prod
+    owner: Jb
+spec:
+    selector:
+      matchLabels:
+        project: home             # Service will look for this Pods Labels
+    template:
+      metadata:
+        labels:
+          project: home           # Service will look for this Pods Labels
+      spec:
+        containers:
+          - name : home-web
+            image: sintepuh2/k8sphp:version3
+            ports:
+              - containerPort: 80   # Port on Pod
+          - name : home-app
+            image: tomcat:8.5.38
+            ports:
+              - containerPort: 8080   # Port on Pod
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: home-autoscaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: deployment
+    name: my-web-deployment-multi-pod
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: AverageValue
+        averageUtilization: 80
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: home-autoscaling-pod-service
+  labels:
+    env  : prod
+    owner: Jb
+spec:
+  type: LoadBalancer
+  selector:
+    project: home              # Selecting PODs with those Labels
+  ports:
+    - name      : my-home-web-listener
+      protocol  : TCP
+      port      : 80           # Port on Load Balancer
+      targetPort: 80           # Port on Pod
+
+    - name      : my-home-app-listener
+      protocol  : TCP
+      port      : 8888         # Port on Load Balancer
+      targetPort: 8080         # Port on Pod
